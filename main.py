@@ -9,8 +9,17 @@ from pyrez.api import RealmRoyaleAPI
 from allowed_dicts import allowed_classes, allowed_gamemode, dict_of_platforms, STATUS_MESSAGES, placement_medals
 from vn_logger import VN_logger
 
-VN_logger.PRINT_MESSAGES = True
-VN_logger.LOGGING = True
+env = environ.Env()
+environ.Env.read_env()
+
+if env('PRINT') == 'True':
+   VN_logger.PRINT_MESSAGES = True
+else:
+   VN_logger.PRINT_MESSAGES = False
+if env('LOGGING') == 'True':
+   VN_logger.LOGGING = True
+else:
+   VN_logger.LOGGING = False
 VN_logger.LOG_LEVEL_CEILING = 0
 if VN_logger.LOGGING:
     VN_logger.logging('RUN', f'Запуск логгера с параметрами FILENAME={VN_logger._FILENAME}.txt,'
@@ -18,8 +27,6 @@ if VN_logger.LOGGING:
                              f' LOGGING={VN_logger.LOGGING},'
                              f' LOG_LEVEL_CEILING={VN_logger.LOG_LEVEL_CEILING}')
 
-env = environ.Env()
-environ.Env.read_env()
 CHANNELS = set()
 
 try:
@@ -311,7 +318,13 @@ async def mi(ctx, match_id, theme='standart'):
         else:
             gamemode_not_live = rr_mi[0]["match_queue_name"].replace('LIVE ', '')
             gamemode_right = allowed_gamemode[gamemode_not_live] if gamemode_not_live in allowed_gamemode else gamemode_not_live
+            total_players, total_teams = 0, 0
+            for team in rr_mi[0]["teams"]:
+                total_teams += 1
+                for _ in team["players"]:
+                    total_players += 1
             embed = discord.Embed(title=f'Матч {match_id} в режиме {gamemode_right}:',
+                                  description=f'{total_players} живых игроков, {total_teams} команд',
                                   color=0xff9955)
             for team in rr_mi[0]["teams"][:4]:
                 title_to_send, value_to_send = "", ""
