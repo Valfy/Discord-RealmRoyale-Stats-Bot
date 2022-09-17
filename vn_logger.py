@@ -16,6 +16,7 @@ class VN_logger():
         'RESPONSE': 30,
         'ERROR': 40
     }
+    BANWORDS = []
 
     @staticmethod
     def logging(level, message):
@@ -35,7 +36,13 @@ class VN_logger():
 
     @staticmethod
     def collect_traceback():
-        VN_logger.logging('ERROR', traceback.format_exc())
+        traceback_text = traceback.format_exc()
+        for word in VN_logger.BANWORDS:
+            for _ in range(len(traceback_text)-len(word)):
+                if word == traceback_text[_:_+len(word)]:
+                    traceback_text = traceback_text[:_] + '#####' + traceback_text[_+len(word):]
+        VN_logger.logging('ERROR', traceback_text)
+        return traceback_text
 
 
 

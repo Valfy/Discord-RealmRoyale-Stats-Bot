@@ -71,6 +71,9 @@ except (pyrez.exceptions.InvalidArgument, pyrez.exceptions.IdOrAuthEmpty) as err
     exit(0)
 else:
     VN_logger.logging('INFO', 'Шаг 4 из 5 Успешное подключение к API')
+finally:
+    VN_logger.BANWORDS.append(str(env('DEV_ID')))
+
 
 bot = commands.Bot(command_prefix='hilda!', status=discord.Status.idle)
 
