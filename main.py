@@ -28,6 +28,7 @@ if VN_logger.LOGGING:
                              f' LOG_LEVEL_CEILING={VN_logger.LOG_LEVEL_CEILING}')
 
 CHANNELS = set()
+LOG_CHANNEL = -1
 
 try:
     VN_logger.logging('INFO', 'Шаг 1 из 5 Попытка прочитать channels.txt')
@@ -35,21 +36,28 @@ try:
         line_number = 0
         for line in reader:
             line_number += 1
-            try:
-                channel_to_add = int(line)
-            except ValueError as error:
-                if line != '\n':
-                    VN_logger.logging('INFO', f'Пропуск линии №{line_number}')
-                    VN_logger.logging('ERROR', error)
+            if 'LOG' in line:
+                try:
+                    LOG_CHANNEL = int(line.replace('LOG', ''))
+                except ValueError as error:
+                    if line != '\n':
+                        VN_logger.logging('INFO', f'Пропуск линии №{line_number}')
+                        VN_logger.logging('ERROR', error)
+                    LOG_CHANNEL = -1
             else:
-                CHANNELS.add(channel_to_add)
-        reader.close()
+                try:
+                    channel_to_add = int(line)
+                except ValueError as error:
+                    if line != '\n':
+                        VN_logger.logging('INFO', f'Пропуск линии №{line_number}')
+                        VN_logger.logging('ERROR', error)
+                else:
+                    CHANNELS.add(channel_to_add)
 except FileNotFoundError as error:
     VN_logger.logging('INFO', 'Шаг 2 из 5 Неудачная попытка прочитать channels.txt, создаю чистый')
     VN_logger.logging('ERROR', error)
     with open('channels.txt', 'w+') as create:
         create.write('')
-        create.close()
 else:
     VN_logger.logging('INFO', 'Шаг 2 из 5 Успешно прочитан channels.txt')
 
@@ -72,9 +80,9 @@ async def on_ready():
 
 
 @bot.command(pass_context=True)
-async def add_channel(ctx, channelID):
-    VN_logger.logging('COMMAND', f'Вызов команды add_channel, с параметрами {channelID}, от пользователя {ctx.author}')
-    global CHANNELS
+async def add_channel(ctx, channelID, status='commands'):
+    VN_logger.logging('COMMAND', f'Вызов команды add_channel, с параметрами {channelID}, {status}, от пользователя {ctx.author}')
+    global CHANNELS, LOG_CHANNEL
     if ctx.message.author.guild_permissions.administrator:
         try:
             channel_to_add = int(channelID)
@@ -83,16 +91,26 @@ async def add_channel(ctx, channelID):
             VN_logger.logging('RESPONSE', f'Ответ пользователю {ctx.author}: Нужно число!')
             await ctx.send('Нужно число!')
         else:
-            if channel_to_add in CHANNELS:
-                VN_logger.logging('RESPONSE', f'Ответ пользователю {ctx.author}: Такой канал уже в списках!')
-                await ctx.send('Такой канал уже в списках!')
+            if status.upper() == 'LOG':
+                if channel_to_add == LOG_CHANNEL:
+                    VN_logger.logging('RESPONSE', f'Ответ пользователю {ctx.author}: В этот канал уже отправляются ошибки!')
+                    await ctx.send('В этот канал уже отправляются ошибки!')
+                else:
+                    LOG_CHANNEL = channel_to_add
+                    with open('channels.txt', 'a') as writer:
+                        writer.write(f'LOG{channel_to_add}\n')
+                    VN_logger.logging('RESPONSE', f'Ответ пользователю {ctx.author}: Понятно!')
+                    await ctx.send('Понятно!')
             else:
-                CHANNELS.add(channel_to_add)
-                with open('channels.txt', 'a') as writer:
-                    writer.write(f'{channel_to_add}\n')
-                    writer.close()
-                VN_logger.logging('RESPONSE', f'Ответ пользователю {ctx.author}: Понятно!')
-                await ctx.send('Понятно!')
+                if channel_to_add in CHANNELS:
+                    VN_logger.logging('RESPONSE', f'Ответ пользователю {ctx.author}: Такой канал уже в списках!')
+                    await ctx.send('Такой канал уже в списках!')
+                else:
+                    CHANNELS.add(channel_to_add)
+                    with open('channels.txt', 'a') as writer:
+                        writer.write(f'{channel_to_add}\n')
+                    VN_logger.logging('RESPONSE', f'Ответ пользователю {ctx.author}: Понятно!')
+                    await ctx.send('Понятно!')
     else:
         VN_logger.logging('RESPONSE', f'Ответ пользователю {ctx.author}: У тебя нет прав!')
         await ctx.send('У тебя нет прав!')
@@ -101,7 +119,7 @@ async def add_channel(ctx, channelID):
 @bot.command(pass_context=True)
 async def delete_channel(ctx, channelID):
     VN_logger.logging('COMMAND', f'Вызов команды delete_channel, с параметрами {channelID}, от пользователя {ctx.author}')
-    global CHANNELS
+    global CHANNELS, LOG_CHANNEL
     if ctx.message.author.guild_permissions.administrator:
         try:
             channel_to_add = int(channelID)
@@ -115,7 +133,8 @@ async def delete_channel(ctx, channelID):
                 with open('channels.txt', 'w') as writer:
                     for channel in CHANNELS:
                         writer.write(f'{channel}\n')
-                    writer.close()
+                    if LOG_CHANNEL != -1:
+                        writer.write(f'LOG{LOG_CHANNEL}\n')
                 VN_logger.logging('RESPONSE', f'Ответ пользователю {ctx.author}: Канал успешно удалён!')
                 await ctx.send('Канал успешно удалён!')
             else:
@@ -129,10 +148,10 @@ async def delete_channel(ctx, channelID):
 @bot.command(pass_context=True)
 async def return_channels(ctx):
     VN_logger.logging('COMMAND', f'Вызов команды return_channel, от пользователя {ctx.author}')
-    global CHANNELS
+    global CHANNELS, LOG_CHANNEL
     if ctx.message.author.guild_permissions.administrator:
         VN_logger.logging('RESPONSE', f'Ответ пользователю {ctx.author}: Список каналов: {list(CHANNELS)}')
-        await ctx.send(f'Список каналов: {list(CHANNELS)}')
+        await ctx.send(f'Список каналов: {list(CHANNELS)}\nКанал логгер: {LOG_CHANNEL}')
     else:
         VN_logger.logging('RESPONSE', f'Ответ пользователю {ctx.author}: У тебя нет прав!')
         await ctx.send('У тебя нет прав!')
@@ -152,9 +171,12 @@ async def profile(ctx, name_or_id, platform='5'):
                                            portalId=dict_of_platforms[platform.upper()] if platform.upper() in dict_of_platforms else 5)
                 playerid = rr_pid[0]["id"]
             except:
-                VN_logger.collect_traceback()
+                MSG = VN_logger.collect_traceback()
                 VN_logger.logging('RESPONSE', f'Ответ пользователю {ctx.author}: Ошибочка!')
                 await ctx.send('Ошибочка!')
+                if LOG_CHANNEL != -1:
+                    channel_to_send_traceback = bot.get_channel(LOG_CHANNEL)
+                    await channel_to_send_traceback.send(MSG)
                 BREAK = True
         else:
             try:
@@ -162,9 +184,12 @@ async def profile(ctx, name_or_id, platform='5'):
                 rr_player = rrAPI.getPlayer(playerid, 5)
                 player_name = rr_player['name']
             except:
-                VN_logger.collect_traceback()
+                MSG = VN_logger.collect_traceback()
                 VN_logger.logging('RESPONSE', f'Ответ пользователю {ctx.author}: Ошибочка!')
                 await ctx.send('Ошибочка!')
+                if LOG_CHANNEL != -1:
+                    channel_to_send_traceback = bot.get_channel(LOG_CHANNEL)
+                    await channel_to_send_traceback.send(MSG)
                 BREAK = True
         finally:
             try:
@@ -172,9 +197,12 @@ async def profile(ctx, name_or_id, platform='5'):
                 rr_status = rrAPI.getPlayerStatus(playerId=playerid)
             except:
                 if not BREAK:
-                    VN_logger.collect_traceback()
+                    MSG = VN_logger.collect_traceback()
                     VN_logger.logging('RESPONSE', f'Ответ пользователю {ctx.author}: Ошибочка!')
                     await ctx.send('Ошибочка!')
+                    if LOG_CHANNEL != -1:
+                        channel_to_send_traceback = bot.get_channel(LOG_CHANNEL)
+                        await channel_to_send_traceback.send(MSG)
             else:
                 try:
                     player_matches_class = {
@@ -236,9 +264,12 @@ async def profile(ctx, name_or_id, platform='5'):
                     await ctx.send(embed=embed)
                 except:
                     if not BREAK:
-                        VN_logger.collect_traceback()
+                        MSG = VN_logger.collect_traceback()
                         VN_logger.logging('RESPONSE', f'Ответ пользователю {ctx.author}: Ошибочка!')
                         await ctx.send('Ошибочка!')
+                        if LOG_CHANNEL != -1:
+                            channel_to_send_traceback = bot.get_channel(LOG_CHANNEL)
+                            await channel_to_send_traceback.send(MSG)
     else:
         VN_logger.logging('INFO', f'Недопустимый канал для команды, пользователю {ctx.author} не отвечаем')
 
@@ -262,9 +293,12 @@ async def mh(ctx, id, matches=None):
             try:
                 rr_history = rrAPI.getMatchHistory(playerId=id)
             except:
-                VN_logger.collect_traceback()
+                MSG = VN_logger.collect_traceback()
                 VN_logger.logging('RESPONSE', f'Ответ пользователю {ctx.author}: Ошибочка!')
                 await ctx.send('Ошибочка!')
+                if LOG_CHANNEL != -1:
+                    channel_to_send_traceback = bot.get_channel(LOG_CHANNEL)
+                    await channel_to_send_traceback.send(MSG)
             else:
                 playername = rr_history["name"]
                 embed = discord.Embed(title=f'Последние матчи игрока {playername}:',
@@ -302,19 +336,26 @@ async def mi(ctx, match_id, theme='standart'):
             try:
                 rr_history = rrAPI.getMatchHistory(playerId=match_id.replace('last', '').replace(' ', ''))
             except:
-                VN_logger.collect_traceback()
+                MSG = VN_logger.collect_traceback()
                 VN_logger.logging('RESPONSE', f'Ответ пользователю {ctx.author}: Ошибочка!')
                 await ctx.send('Ошибочка!')
+                if LOG_CHANNEL != -1:
+                    channel_to_send_traceback = bot.get_channel(LOG_CHANNEL)
+                    await channel_to_send_traceback.send(MSG)
                 BREAK = True
             else:
                 match_id = str(rr_history["matches"][0]["match_id"])
+
         try:
             rr_mi = rrAPI.getMatch(matchId=[match_id])
         except:
             if not BREAK:
-                VN_logger.collect_traceback()
+                MSG = VN_logger.collect_traceback()
                 VN_logger.logging('RESPONSE', f'Ответ пользователю {ctx.author}: Ошибочка!')
                 await ctx.send('Ошибочка!')
+                if LOG_CHANNEL != -1:
+                    channel_to_send_traceback = bot.get_channel(LOG_CHANNEL)
+                    await channel_to_send_traceback.send(MSG)
         else:
             gamemode_not_live = rr_mi[0]["match_queue_name"].replace('LIVE ', '')
             gamemode_right = allowed_gamemode[gamemode_not_live] if gamemode_not_live in allowed_gamemode else gamemode_not_live
@@ -349,6 +390,68 @@ async def mi(ctx, match_id, theme='standart'):
             await ctx.send(embed=embed)
     else:
         VN_logger.logging('INFO', f'Недопустимый канал для команды, пользователю {ctx.author} не отвечаем')
+
+
+@bot.command(pass_context=True)
+async def status(ctx, name_or_id, platform='5'):
+    VN_logger.logging('COMMAND', f'Вызов команды status, с параметрами {name_or_id}, {platform}, от пользователя {ctx.author}')
+    BREAK = False
+    if ctx.channel.id in CHANNELS:
+        try:
+            type_test = int(name_or_id)
+        except ValueError:
+            player_name = name_or_id
+            try:
+                rr_pid = rrAPI.getPlayerId(playerName=player_name,
+                                           portalId=dict_of_platforms[platform.upper()] if platform.upper() in dict_of_platforms else 5)
+                playerid = rr_pid[0]["id"]
+            except:
+                MSG = VN_logger.collect_traceback()
+                VN_logger.logging('RESPONSE', f'Ответ пользователю {ctx.author}: Ошибочка!')
+                await ctx.send('Ошибочка!')
+                if LOG_CHANNEL != -1:
+                    channel_to_send_traceback = bot.get_channel(LOG_CHANNEL)
+                    await channel_to_send_traceback.send(MSG)
+                BREAK = True
+        else:
+            try:
+                playerid = type_test
+                rr_player = rrAPI.getPlayer(playerid, 5)
+                player_name = rr_player['name']
+            except:
+                MSG = VN_logger.collect_traceback()
+                VN_logger.logging('RESPONSE', f'Ответ пользователю {ctx.author}: Ошибочка!')
+                await ctx.send('Ошибочка!')
+                if LOG_CHANNEL != -1:
+                    channel_to_send_traceback = bot.get_channel(LOG_CHANNEL)
+                    await channel_to_send_traceback.send(MSG)
+                BREAK = True
+        finally:
+            try:
+                rr_status = rrAPI.getPlayerStatus(playerId=playerid)
+            except:
+                if not BREAK:
+                    MSG = VN_logger.collect_traceback()
+                    VN_logger.logging('RESPONSE', f'Ответ пользователю {ctx.author}: Ошибочка!')
+                    await ctx.send('Ошибочка!')
+                    if LOG_CHANNEL != -1:
+                        channel_to_send_traceback = bot.get_channel(LOG_CHANNEL)
+                        await channel_to_send_traceback.send(MSG)
+            else:
+                try:
+                    VN_logger.logging('RESPONSE', f'Ответ пользователю {ctx.author}: Статус игрока {player_name}: {STATUS_MESSAGES[rr_status["status_id"]]}')
+                    await ctx.send(f'Статус игрока {player_name}: {STATUS_MESSAGES[rr_status["status_id"]]}')
+                except:
+                    if not BREAK:
+                        MSG = VN_logger.collect_traceback()
+                        VN_logger.logging('RESPONSE', f'Ответ пользователю {ctx.author}: Ошибочка!')
+                        await ctx.send('Ошибочка!')
+                        if LOG_CHANNEL != -1:
+                            channel_to_send_traceback = bot.get_channel(LOG_CHANNEL)
+                            await channel_to_send_traceback.send(MSG)
+    else:
+        VN_logger.logging('INFO', f'Недопустимый канал для команды, пользователю {ctx.author} не отвечаем')
+
 
 TOKEN = env('HILDA_TOKEN')
 bot.run(TOKEN)
