@@ -71,11 +71,11 @@ except (pyrez.exceptions.InvalidArgument, pyrez.exceptions.IdOrAuthEmpty) as err
     exit(0)
 else:
     VN_logger.logging('INFO', 'Шаг 4 из 5 Успешное подключение к API')
-finally:
     VN_logger.BANWORDS.append(str(env('DEV_ID')))
 
 
 bot = commands.Bot(command_prefix='hilda!', status=discord.Status.idle)
+
 
 @bot.event
 async def on_ready():
@@ -367,10 +367,23 @@ async def mi(ctx, match_id, theme='standart'):
                 total_teams += 1
                 for _ in team["players"]:
                     total_players += 1
+            if gamemode_not_live == 'Wars':
+                total_teams = 2
+                teams_info = [{"id": 1,
+                               "placement": 1,
+                               "players": []},
+                              {"id": 2,
+                               "placement": 999,
+                               "players": []}]
+                for team in rr_mi[0]["teams"]:
+                    for player in team["players"]:
+                        teams_info[0 if team["placement"] == 1 else 1]["players"].append(player)
+            else:
+                teams_info = rr_mi[0]["teams"][:10 if 'Соло' in gamemode_right else 5]
             embed = discord.Embed(title=f'Матч {match_id} в режиме {gamemode_right}:',
                                   description=f'{total_players} живых игроков, {total_teams} команд',
                                   color=0xff9955)
-            for team in rr_mi[0]["teams"][:4]:
+            for team in teams_info:
                 title_to_send, value_to_send = "", ""
                 if team["placement"] <= 3:
                     title_to_send += f'🟠 {placement_medals[team["placement"]]} топ {team["placement"]}'

@@ -4,7 +4,8 @@ allowed_classes = {
     'Assassin': 'Убийца',
     'Hunter': 'Охотник',
     'Warrior': 'Воин',
-    'Mage': 'Маг'
+    'Mage': 'Маг',
+    'Engineer': 'Инженер',
 }
 
 allowed_gamemode = {
@@ -16,6 +17,8 @@ allowed_gamemode = {
     "Squad": 'Отряд',
     "Quad": 'Отряд',
     "Custom Game Trio": 'Пользовательская игра Трио',
+    "Realm Wars": 'Командный бой насмерть',
+    "Wars": 'Командный бой насмерть',
 }
 
 dict_of_platforms = {
